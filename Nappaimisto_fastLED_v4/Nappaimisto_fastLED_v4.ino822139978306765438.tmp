@@ -1,0 +1,169 @@
+#include <FastLED.h>
+#ifdef __AVR__
+  #include <avr/power.h>
+#endif
+
+#define NUM_LEDS 19
+#define DATA_PIN 0
+
+int LED_NUMBERS[19] = { 0, 18, 1, 17, 2, 16, 3, 15, 4, 14, 5, 13, 6, 12, 7, 11, 8, 10, 9 };
+
+CRGB leds[NUM_LEDS];
+
+int button_pin = 4;
+int numlock = A3;
+
+boolean buttonState = HIGH;
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50;
+boolean lastState = HIGH;
+int button_timer_counter = 0;
+
+unsigned long last_update = 0;
+unsigned long updatetime = 5000;
+
+int valomodi = 0;
+int kirkkaus = 255;
+
+int kiertolisays = 0;
+
+unsigned long kiertoaika = 10;
+unsigned long last_kierto;
+//******************************************* BUT ***********************************
+byte button()
+{
+	buttonState = digitalRead(button_pin);
+	if (millis() - lastDebounceTime > debounceDelay) 
+	{
+		lastDebounceTime = millis();
+		if (buttonState == LOW && lastState == HIGH) 
+		{
+
+			button_timer_counter = 0;
+			lastState = LOW;
+			lastDebounceTime = millis();
+		}
+		else if (buttonState == LOW && lastState == LOW) 
+		{
+			button_timer_counter +=1 ;
+			lastState = LOW;
+		}
+		else if (buttonState == HIGH && lastState == LOW && button_timer_counter < 20) 
+		{
+			lastState = HIGH;
+			//TODO
+			return 1; // LYHYT PAINALLUS
+		}
+		if (button_timer_counter == 20)
+		{
+			//button_timer_counter = 0;
+			//TODO
+			return 2; // PITK� PAINALLUS
+		}
+		if (buttonState == HIGH) 
+		{
+			button_timer_counter = 0;
+			lastState = HIGH;
+		}
+	}
+	return 0;
+}
+//******************************************* BUT ***********************************
+
+
+bool power_switch()
+{
+	int numlockstate = analogRead(numlock);
+
+	if (numlockstate >= 255)
+	{
+		return false;
+	}
+	else
+	{
+		return true;
+	}
+}
+
+
+void setup() 
+{
+	FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS);
+  
+	pinMode(button_pin, INPUT_PULLUP);
+	pinMode(numlock, INPUT);
+	// This is for Trinket 5V 16MHz, you can remove these three lines if you are not using a Trinket
+	#if defined (__AVR_ATtiny85__)
+	if (F_CPU == 16000000) clock_prescale_set(clock_div_1);
+	#endif
+	// End of trinket special code
+}
+
+
+void loop() 
+{
+	if (true)
+	{
+		int nappi = button();
+		switch(nappi)
+		{
+			case 0:
+				break;
+			case 1:
+				valomodi += 16;
+				if (valomodi >= 288) {valomodi = 0;}
+				break;
+			case 2:
+				kirkkaus +=85;
+				if (kirkkaus >= 256)
+				{
+					kirkkaus = 0;
+				}
+				break;
+		}
+
+		if (valomodi < 256)
+		{
+			if (millis() - last_update >= updatetime || nappi != 0)
+			{
+				last_update = millis();
+      
+				for(int i=0; i<NUM_LEDS; i++) {leds[i].setHSV(valomodi, 255, kirkkaus);}
+				FastLED.show(); 
+			}
+		}
+
+		else if (valomodi == 256) // valkonen
+		{
+			for (int i = 0; i<NUM_LEDS; i++) { leds[i].setHSV(0, 0, 255); }
+			FastLED.show();
+		}
+
+		else if (valomodi == 272) // sateenkaari kierto
+		{
+			if (millis() - last_kierto >= kiertoaika)
+			{
+				last_kierto = millis();
+				int vari = 0;
+				int lisays = 128;
+				for (int i = 0; i < NUM_LEDS; i++)
+				{
+					leds[LED_NUMBERS[i]].setHSV( ( vari / 10 + kiertolisays ) % 256 , 255 , kirkkaus );
+					vari += lisays;
+				}
+				kiertolisays += 1;
+				if (kiertolisays >= 256)
+				{
+					kiertolisays = 0;
+				}
+			}
+          FastLED.show();
+
+		}
+	}
+	else
+	{
+		for (int i = 0; i<NUM_LEDS; i++) { leds[i].setHSV(valomodi, 255, 0); }
+		FastLED.show();
+	}
+}
